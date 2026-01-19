@@ -1,44 +1,47 @@
 ---
-# MySQL Deployment
+# 1️⃣ MySQL Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: mysql
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
         app: mysql
     spec:
       containers:
-      - image: mysql:8
-        name: mysql
-        env:
-        - name: MYSQL_ROOT_PASSWORD
-          value: "Test@123"
-        - name: MYSQL_DATABASE
-          value: "bankappdb"
-        ports:
-        - containerPort: 3306
-          name: mysql
+        - name: mysql
+          image: mysql:8
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "Test@123"
+            - name: MYSQL_DATABASE
+              value: "bankappdb"
+            - name: MYSQL_USER
+              value: "bankuser"
+            - name: MYSQL_PASSWORD
+              value: "bankpass"
 ---
-# MySQL Service
+# 2️⃣ MySQL Service
 apiVersion: v1
 kind: Service
 metadata:
   name: mysql-service
 spec:
-  ports:
-  - port: 3306
   selector:
     app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
 ---
-# Java Application Deployment
+# 3️⃣ BankApp Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -54,27 +57,28 @@ spec:
         app: bankapp
     spec:
       containers:
-      - name: bankapp
-        image: adijaiswal/bankapp:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: SPRING_DATASOURCE_URL
-          value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-        - name: SPRING_DATASOURCE_USERNAME
-          value: root
-        - name: SPRING_DATASOURCE_PASSWORD
-          value: Test@123
+        - name: bankapp
+          image: mumairask750/bankapp:latest   # tumhara dockerhub image
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: bankuser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: bankpass
 ---
-# Bank Application Service
+# 4️⃣ BankApp Service (NodePort for Minikube)
 apiVersion: v1
 kind: Service
 metadata:
   name: bankapp-service
 spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-    targetPort: 8080
+  type: NodePort
   selector:
     app: bankapp
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30007   # Access via minikube service
