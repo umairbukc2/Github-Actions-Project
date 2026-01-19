@@ -1,27 +1,31 @@
-# MySQL Database
+---
+# MySQL Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: mysql
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
         app: mysql
     spec:
       containers:
-        - name: mysql
-          image: mysql:8
-          env:
-            - name: MYSQL_ROOT_PASSWORD
-              value: "Test@123"
-            - name: MYSQL_DATABASE
-              value: "bankappdb"
-
+      - image: mysql:8
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "Test@123"
+        - name: MYSQL_DATABASE
+          value: "bankappdb"
+        ports:
+        - containerPort: 3306
+          name: mysql
 ---
 # MySQL Service
 apiVersion: v1
@@ -29,13 +33,12 @@ kind: Service
 metadata:
   name: mysql-service
 spec:
+  ports:
+  - port: 3306
   selector:
     app: mysql
-  ports:
-    - port: 3306
-
 ---
-# BankApp Deployment
+# Java Application Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -51,29 +54,27 @@ spec:
         app: bankapp
     spec:
       containers:
-        - name: bankapp
-          image: mumairask750/bankapp:latest
-          ports:
-            - containerPort: 8080
-          env:
-            - name: SPRING_DATASOURCE_URL
-              value: "jdbc:mysql://mysql-service:3306/bankappdb"
-            - name: SPRING_DATASOURCE_USERNAME
-              value: "root"
-            - name: SPRING_DATASOURCE_PASSWORD
-              value: "Test@123"
-
+      - name: bankapp
+        image: mumairask750/bankapp:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+        - name: SPRING_DATASOURCE_USERNAME
+          value: root
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: Test@123
 ---
-# BankApp Service (Access ke liye)
+# Bank Application Service
 apiVersion: v1
 kind: Service
 metadata:
   name: bankapp-service
 spec:
-  type: NodePort
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
   selector:
     app: bankapp
-  ports:
-    - port: 80
-      targetPort: 8080
-      nodePort: 30007

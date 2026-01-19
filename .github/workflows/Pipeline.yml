@@ -128,26 +128,124 @@ jobs:
           file: Dockerfile
           push: true
           tags: mumairask750/bankapp:latest
-
-  deploy_to_k8s:
+          
+  deploy_to_kubernetes:
     runs-on: self-hosted
     needs: build_docker_image_and_push
-
+    if: success()  # Only run if previous steps succeeded
+    
     steps:
       - uses: actions/checkout@v4
-      - name: Install kubectl
+      
+      - name: Set up kubectl
         run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-      - name: Install Minikube
+          # Install kubectl if not present
+          if ! command -v kubectl &> /dev/null; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+          fi
+          
+      - name: Deploy MySQL
         run: |
-          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-          sudo install minikube-linux-amd64 /usr/local/bin/minikube
-          minikube start --driver=docker
-      - name: Deploy to Minikube
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: mysql
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: mysql
+            template:
+              metadata:
+                labels:
+                  app: mysql
+              spec:
+                containers:
+                - name: mysql
+                  image: mysql:8
+                  env:
+                  - name: MYSQL_ROOT_PASSWORD
+                    value: "Test@123"
+                  - name: MYSQL_DATABASE
+                    value: "bankappdb"
+          EOF
+          
+      - name: Create MySQL Service
         run: |
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: mysql-service
+          spec:
+            selector:
+              app: mysql
+            ports:
+            - port: 3306
+              targetPort: 3306
+          EOF
+      
+      - name: Wait for MySQL
+        run: sleep 30
+      
+      - name: Deploy BankApp
+        run: |
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: bankapp
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: bankapp
+            template:
+              metadata:
+                labels:
+                  app: bankapp
+              spec:
+                containers:
+                - name: bankapp
+                  image: mumairask750/bankapp:latest
+                  ports:
+                  - containerPort: 8080
+                  env:
+                  - name: SPRING_DATASOURCE_URL
+                    value: "jdbc:mysql://mysql-service:3306/bankappdb"
+                  - name: SPRING_DATASOURCE_USERNAME
+                    value: "root"
+                  - name: SPRING_DATASOURCE_PASSWORD
+                    value: "Test@123"
+          EOF
+      
+      - name: Expose BankApp Service
+        run: |
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: bankapp-service
+          spec:
+            type: NodePort
+            selector:
+              app: bankapp
+            ports:
+            - port: 80
+              targetPort: 8080
+              nodePort: 30007
+          EOF
+      
       - name: Verify Deployment
-        run: kubectl get pods -o wide
+        run: |
+          echo "Waiting for pods to start..."
+          sleep 45
+          kubectl get pods
+          kubectl get svc
+          echo ""
+          echo "🎉 Application deployed successfully!"
+          echo "Access your app at: http://$(minikube ip):30007"
+
+ 
