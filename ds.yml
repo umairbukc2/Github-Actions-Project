@@ -1,5 +1,4 @@
----
-# 1️⃣ MySQL Deployment
+# MySQL Database
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,19 +16,14 @@ spec:
       containers:
         - name: mysql
           image: mysql:8
-          ports:
-            - containerPort: 3306
           env:
             - name: MYSQL_ROOT_PASSWORD
               value: "Test@123"
             - name: MYSQL_DATABASE
               value: "bankappdb"
-            - name: MYSQL_USER
-              value: "bankuser"
-            - name: MYSQL_PASSWORD
-              value: "bankpass"
+
 ---
-# 2️⃣ MySQL Service
+# MySQL Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -39,9 +33,9 @@ spec:
     app: mysql
   ports:
     - port: 3306
-      targetPort: 3306
+
 ---
-# 3️⃣ BankApp Deployment
+# BankApp Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -58,18 +52,19 @@ spec:
     spec:
       containers:
         - name: bankapp
-          image: mumairask750/bankapp:latest   # tumhara dockerhub image
+          image: mumairask750/bankapp:latest
           ports:
             - containerPort: 8080
           env:
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+              value: "jdbc:mysql://mysql-service:3306/bankappdb"
             - name: SPRING_DATASOURCE_USERNAME
-              value: bankuser
+              value: "root"
             - name: SPRING_DATASOURCE_PASSWORD
-              value: bankpass
+              value: "Test@123"
+
 ---
-# 4️⃣ BankApp Service (NodePort for Minikube)
+# BankApp Service (Access ke liye)
 apiVersion: v1
 kind: Service
 metadata:
@@ -81,4 +76,4 @@ spec:
   ports:
     - port: 80
       targetPort: 8080
-      nodePort: 30007   # Access via minikube service
+      nodePort: 30007
