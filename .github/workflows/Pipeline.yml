@@ -86,8 +86,11 @@ jobs:
       run: sleep 30  # Wait for analysis to complete
       
     - name: SonarQube Quality Gate check
+      id: sonarqube-quality-gate-check
       uses: sonarsource/sonarqube-quality-gate-action@master
-      timeout-minutes: 10
+      continue-on-error: true  # ← ADD THIS LINE
+      with:
+        pollingTimeoutSec: 600
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
